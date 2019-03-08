@@ -1,4 +1,4 @@
-// Package serial provides a number of helper for efficiently serializing data.
+// Package rye provides a number of helper for efficiently serializing data.
 //
 // Serialization is performed by the Serializer. It performs serialization in
 // two passes. The first pass computes the size needed. The second pass writes
