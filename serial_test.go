@@ -38,7 +38,7 @@ func TestLittleEdian(t *testing.T) {
 
 func TestRoundTrip(t *testing.T) {
 	s := Serializer{
-		Data: make([]byte, 8),
+		Data: make([]byte, 26),
 	}
 
 	d := Deserializer{
@@ -92,6 +92,21 @@ func TestRoundTrip(t *testing.T) {
 	s.Int64(y64)
 	assert.Equal(t, y64, d.Int64())
 	s.Idx, d.Idx = 0, 0
+
+	str := "Hi there, this is a test"
+	s.CompactString(str)
+	assert.Equal(t, str, d.CompactString())
+	s.Idx, d.Idx = 0, 0
+
+	var f32 float32 = 3.1415
+	s.Float32(f32)
+	assert.Equal(t, f32, d.Float32())
+	s.Idx, d.Idx = 0, 0
+
+	var f64 float64 = 3.1415926
+	s.Float64(f64)
+	assert.Equal(t, f64, d.Float64())
+	s.Idx, d.Idx = 0, 0
 }
 
 func TestPrefixers(t *testing.T) {
@@ -101,7 +116,7 @@ func TestPrefixers(t *testing.T) {
 		p    Prefixer
 	}{
 		{
-			name: "Static - Basic",
+			name: "Static:Basic",
 			data: [][]byte{
 				{1, 2, 3, 4},
 				{5, 6},
@@ -111,17 +126,17 @@ func TestPrefixers(t *testing.T) {
 			p: NewStaticPrefixer(1, 1, 1, 0),
 		},
 		{
-			name: "Static - Compact",
+			name: "Static:Compact",
 			data: [][]byte{
 				{1, 2, 3, 4},
 				{5, 6},
 				{7, 8, 9, 10, 11, 12, 13, 14, 15},
 				{16, 17, 18, 19, 20},
 			},
-			p: NewStaticPrefixer(10, 10, 10, 0),
+			p: NewStaticPrefixer(9, 9, 9, 0),
 		},
 		{
-			name: "Dynamic - Basic",
+			name: "Dynamic:Basic",
 			data: [][]byte{
 				{1, 2, 3, 4},
 				{5, 6},
@@ -131,14 +146,14 @@ func TestPrefixers(t *testing.T) {
 			p: NewDynamicPrefixer(1, 1),
 		},
 		{
-			name: "Dynamic - Compact",
+			name: "Dynamic:Compact",
 			data: [][]byte{
 				{1, 2, 3, 4},
 				{5, 6},
 				{7, 8, 9, 10, 11, 12, 13, 14, 15},
 				{16, 17, 18, 19, 20},
 			},
-			p: NewDynamicPrefixer(10, 10),
+			p: NewDynamicPrefixer(9, 9),
 		},
 	}
 
@@ -205,7 +220,7 @@ func TestMarshalUnmarshalHeader(t *testing.T) {
 	}
 }
 
-func TestCompact(t *testing.T) {
+func TestCompactUint64(t *testing.T) {
 	tt := []uint64{
 		0,
 		1,
@@ -217,18 +232,102 @@ func TestCompact(t *testing.T) {
 	}
 	for _, tc := range tt {
 		t.Run(strconv.FormatUint(tc, 10), func(t *testing.T) {
-			s := &Serializer{
-				Size: CompactUint64Size(tc),
-			}
-			s.Make()
-
-			s.CompactUint64(tc)
-
-			d := &Deserializer{
-				Data: s.Data,
-			}
-
-			assert.Equal(t, tc, d.CompactUint64())
+			assert.Equal(t, tc, e2eUint64(tc))
 		})
 	}
+
+	// Explicitly test largest uint64
+	var x uint64
+	x--
+	assert.Equal(t, x, e2eUint64(x))
+}
+
+func e2eUint64(x uint64) uint64 {
+	s := &Serializer{
+		Size: CompactUint64Size(x),
+	}
+	s.Make()
+
+	s.CompactUint64(x)
+
+	d := &Deserializer{
+		Data: s.Data,
+	}
+	return d.CompactUint64()
+}
+
+func TestCompactInt64(t *testing.T) {
+	tt := []int64{
+		0,
+		1,
+		-1,
+	}
+	for i := int64(7); i < 62; i *= 2 {
+		tt = append(tt, i, -i)
+	}
+
+	for _, tc := range tt {
+		t.Run(strconv.FormatInt(tc, 10), func(t *testing.T) {
+			assert.Equal(t, tc, e2eInt64(tc))
+		})
+	}
+}
+
+func e2eInt64(x int64) int64 {
+	s := &Serializer{
+		Size: CompactInt64Size(x),
+	}
+	s.Make()
+
+	s.CompactInt64(x)
+
+	d := &Deserializer{
+		Data: s.Data,
+	}
+	return d.CompactInt64()
+}
+
+func TestSizeNegOne(t *testing.T) {
+	assert.Equal(t, 1, CompactInt64Size(-1))
+}
+
+func TestCompactIntLargestSmallest(t *testing.T) {
+	var l uint64
+	l--
+	l >>= 1
+	i := int64(l)
+
+	// i is the largest positive int that fits in int64; adding 1 rolls over to a
+	// negative number
+	assert.True(t, i+1 < i)
+
+	s := &Serializer{
+		Size: 9,
+	}
+	s.Make()
+	s.CompactInt64(i)
+
+	d := NewDeserializer(s.Data)
+	i2 := d.CompactInt64()
+
+	assert.Equal(t, i, i2)
+
+	l = 1
+	l <<= 63
+	i = int64(l)
+
+	// i is the largest negative int that fits in int64; subtracting one rolls
+	// over to a positive number
+	assert.True(t, i-1 > i)
+
+	s = &Serializer{
+		Size: 9,
+	}
+	s.Make()
+	s.CompactInt64(i)
+
+	d = NewDeserializer(s.Data)
+	i2 = d.CompactInt64()
+
+	assert.Equal(t, i, i2)
 }
