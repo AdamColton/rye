@@ -25,8 +25,14 @@ func (d *Deserializer) Sub(ln int) *Deserializer {
 
 // Byte returns one byte from the Deserializer and increases the index.
 func (d *Deserializer) Byte() byte {
-	d.Idx++
+	d.Idx += 1
 	return d.Data[d.Idx-1]
+}
+
+// Uint8 returns a uint8 from the Deserializer and increases the index.
+func (d *Deserializer) Uint8() uint8 {
+	d.Idx += 1
+	return uint8(d.Data[d.Idx-1])
 }
 
 // Uint16 returns a uint16 from the Deserializer and increases the index.
@@ -58,7 +64,7 @@ func (d *Deserializer) Uint64() uint64 {
 }
 
 // Uint returns a uint64 from a specific number of bytes. The size must be
-// either 1, 2, 4, 8 or 10 otherwise a 0 is returned. A value of 10 will make a
+// either 1, 2, 4, 8 or 9 otherwise a 0 is returned. A value of 9 will make a
 // call to CompactUint64
 func (d *Deserializer) Uint(size int) uint64 {
 	switch size {
@@ -70,10 +76,31 @@ func (d *Deserializer) Uint(size int) uint64 {
 		return uint64(d.Uint32())
 	case 8:
 		return d.Uint64()
-	case 10:
+	case CompactSize:
 		return d.CompactUint64()
 	}
 	return 0
+}
+
+func (d *Deserializer) Int(size int) int64 {
+	switch size {
+	case 1:
+		return int64(d.Byte())
+	case 2:
+		return int64(d.Uint16())
+	case 4:
+		return int64(d.Uint32())
+	case 8:
+		return d.Int64()
+	case CompactSize:
+		return d.CompactInt64()
+	}
+	return 0
+}
+
+// Int8 returns an int8 from the Deserializer and increases the index.
+func (d *Deserializer) Int8() int8 {
+	return int8(d.Uint8())
 }
 
 // Int16 returns an int16 from the Deserializer and increases the index.
@@ -107,9 +134,21 @@ func (d *Deserializer) Slice(ln int) []byte {
 	return d.Data[d.Idx-ln : d.Idx]
 }
 
+// CompactSlice reads the length as a CompactUint64 then reads in the slice and
+// increases the index with both operations.
+func (d *Deserializer) CompactSlice() []byte {
+	return d.Slice(int(d.CompactUint64()))
+}
+
 // String returns a string with a byte length of ln and increases the index.
 func (d *Deserializer) String(ln int) string {
 	return string(d.Slice(ln))
+}
+
+// CompactString reads the length as a CompactUint64 then reads in the string
+// and increases the index with both operations.
+func (d *Deserializer) CompactString() string {
+	return string(d.CompactSlice())
 }
 
 // UnmarshalHeader takes a HeaderSize to read the size of a Sub-Deserializer and
