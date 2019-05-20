@@ -20,11 +20,11 @@ type staticPrefixer struct {
 // NewStaticPrefixer returns a Prefixer that will prefix a set number of byte
 // slices. One header is given for each slice that will be prefixed. A header
 // value of 1,2,4,6 or 8 indicates the number of bytes to use for the header. A
-// value of 10 indicates that a Compact uint64 should be used. A negative value
+// value of 9 indicates that a Compact uint64 should be used. A negative value
 // indicates that no header should be included and the length will be the
 // positive value. If the last header is 0, that indicates that no header should
 // be included because the remainder of the data is part of the final slice. So
-// NewStaticPrefixer(2, 10, -6, 0) says there will be four byte slices. For the
+// NewStaticPrefixer(2, 9, -6, 0) says there will be four byte slices. For the
 // first, two bytes should be used express the length, for the second a compact
 // uint64 should be used, the third slice will be exactly 6 bytes long and the
 // last will have no header and should read to the end of the serialized data.
@@ -34,9 +34,9 @@ func NewStaticPrefixer(headers ...int) Prefixer {
 	for i, h := range headers {
 		if h > 0 {
 			if h != 1 && h != 2 && h != 4 && h != 8 && h != CompactSize {
-				panic("Positive header size must be 1, 2, 4, 8 or 10")
+				panic("Positive header size must be 1, 2, 4, 8 or 9")
 			}
-			if h != 10 {
+			if h != CompactSize {
 				size += h
 			}
 		} else if h == 0 && i != len(headers)-1 {
@@ -127,19 +127,19 @@ type dynamicPrefixer struct {
 // NewDynamicPrefixer writes one outer prefix that holds the number of slices,
 // then each slice has it's own prefix holding it's length. For both outer and
 // inner length bytes 1, 2, 4 or 8 indicate the number of bytes to use to encode
-// the length. A value of 10 indicates that a Compact Uint64 should be used. A
+// the length. A value of 9 indicates that a Compact Uint64 should be used. A
 // negative value indicates that the length is fixed to the positive value. So
 // NewDynamicPrefixer(1,2) would use one byte to encode the outer length and 2
-// bytes to encdoe the length of each byte slice. NewDynamicPrefixer(10, -32)
+// bytes to encdoe the length of each byte slice. NewDynamicPrefixer(9, -32)
 // would use a Compact Uint64 to encode the number of slices and each slice
 // would be exactly 32 bytes long
 func NewDynamicPrefixer(outerLengthBytes, innerLengthBytes int) Prefixer {
 	if outerLengthBytes >= 0 && outerLengthBytes != 1 && outerLengthBytes != 2 && outerLengthBytes != 4 && outerLengthBytes != 8 && outerLengthBytes != CompactSize {
-		panic("outerLengthBytes must be 1, 2, 4, 8, 10 or negative")
+		panic("outerLengthBytes must be 1, 2, 4, 8, 9 or negative")
 	}
 
 	if innerLengthBytes >= 0 && innerLengthBytes != 1 && innerLengthBytes != 2 && innerLengthBytes != 4 && innerLengthBytes != 8 && innerLengthBytes != CompactSize {
-		panic("innerLengthBytes must be 1, 2, 4, 8, 10 or negative")
+		panic("innerLengthBytes must be 1, 2, 4, 8, 9 or negative")
 	}
 
 	return &dynamicPrefixer{
