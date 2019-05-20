@@ -19,7 +19,13 @@ func (s *Serializer) Make() {
 // Byte writes a byte to the Serializer and increases the index.
 func (s *Serializer) Byte(b byte) {
 	s.Data[s.Idx] = b
-	s.Idx++
+	s.Idx += 1
+}
+
+// Uint8 writes a uint8 to the Serializer and increases the index.
+func (s *Serializer) Uint8(x uint8) {
+	s.Data[s.Idx] = byte(x)
+	s.Idx += 1
 }
 
 // Uint16 writes a uint16 to the Serializer and increases the index.
@@ -64,9 +70,29 @@ func (s *Serializer) Uint(size int, value uint64) {
 		s.Uint32(uint32(value))
 	case 8:
 		s.Uint64(uint64(value))
-	case 10:
+	case CompactSize:
 		s.CompactUint64(value)
 	}
+}
+
+func (s *Serializer) Int(size int, value int64) {
+	switch size {
+	case 1:
+		s.Byte(byte(value))
+	case 2:
+		s.Uint16(uint16(value))
+	case 4:
+		s.Uint32(uint32(value))
+	case 8:
+		s.Uint64(uint64(value))
+	case CompactSize:
+		s.CompactInt64(value)
+	}
+}
+
+// Int8 writes a int8 to the Serializer and increases the index.
+func (s *Serializer) Int8(x int8) {
+	s.Byte(byte(x))
 }
 
 // Int16 writes a int16 to the Serializer and increases the index.
@@ -85,7 +111,7 @@ func (s *Serializer) Int64(x int64) {
 }
 
 // Float32 writes a float32 to the Serializer and increases the index.
-func (s *Serializer) vFloat32(f float32) {
+func (s *Serializer) Float32(f float32) {
 	s.Uint32(float32ToUint32(f))
 }
 
@@ -100,9 +126,22 @@ func (s *Serializer) Slice(data []byte) {
 	s.Idx += len(data)
 }
 
+// CompactSlice writes the length of the slice as a CompactUint64 then writes
+// the slice
+func (s *Serializer) CompactSlice(data []byte) {
+	s.CompactUint64(uint64(len(data)))
+	s.Slice(data)
+}
+
 // String writes a string to the Serializer and increases the index.
 func (s *Serializer) String(data string) {
 	s.Slice([]byte(data))
+}
+
+// CompactString writes the length of the string as a CompactUint64 then writes
+// the string
+func (s *Serializer) CompactString(data string) {
+	s.CompactSlice([]byte(data))
 }
 
 // MarshalHeader will take a marshaller and prepend it's size. Useful when
